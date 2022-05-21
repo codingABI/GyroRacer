@@ -12,5 +12,6 @@ Running on breadboard was not very stable for me over time (occassionally i2c-bu
 
 ![schema](/assets/images/Schema.svg) 
 
-Video [![video](https://youtu.be/_jVGUhDsQbE)
+Video https://youtu.be/_jVGUhDsQbE
+
 
