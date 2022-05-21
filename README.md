@@ -4,7 +4,7 @@ Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game
 ![screenshot](/assets/images/Screenshot.png) 
 
 ## Hardware
-Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and a optional passive buzzer.
+Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and an optional passive buzzer.
 
 ![breadboard](/assets/images/Breadboard.svg) 
 
