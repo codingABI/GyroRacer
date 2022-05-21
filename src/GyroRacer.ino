@@ -1,7 +1,7 @@
 /*
  * Project: GyroRacer
  * Description: Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game is short and more a technical demo
- * Hardward: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and optional passive buzzer
+ * Hardward: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and a optional passive buzzer
  * License: MIT License
  * Copyright (c) 2022 codingABI
  * 
