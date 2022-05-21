@@ -1,7 +1,7 @@
 /*
  * Project: GyroRacer
  * Description: Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game is short and more a technical demo
- * Hardward: Arduino Uno/Nano with gyroscope sensor MPU6050 and SSD1306 OLED 128x64 pixel display
+ * Hardward: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and optional passive buzzer
  * License: MIT License
  * Copyright (c) 2022 codingABI
  * 
@@ -19,6 +19,9 @@
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+#define BUZZERPIN 5
+#define WITHBUZZER // comment out this line, if you want no sound
 
 // SSD1306 I2C 
 #define OLED_RESET -1 // no reset pin
@@ -160,7 +163,7 @@ void drawPlayer() {
   for (int i=0;i<SPRITEHEIGHT;i++) {
     for (int j=0;j<SPRITEWIDTH;j++) {
       if (g_sprite > 2) { // sprite number 3 and 4 are only mirrored sprites 1 and 2
-        color = pgm_read_byte_near(&(g_playerSprites[g_sprite-2][i][SPRITEWIDTH-j]));
+        color = pgm_read_byte_near(&(g_playerSprites[g_sprite-2][i][SPRITEWIDTH-j-1]));
       } else { 
         color = pgm_read_byte_near(&(g_playerSprites[g_sprite][i][j]));
       }
@@ -385,7 +388,6 @@ void setup(void) {
     // Calibration Time: generate offsets and calibrate our MPU6050
     mpu.CalibrateAccel(6);
     mpu.CalibrateGyro(6);
-    mpu.PrintActiveOffsets();
     // turn on the DMP, now that it's ready
     mpu.setDMPEnabled(true);
 
@@ -419,6 +421,7 @@ void loop(void) {
   char strData[24];
   unsigned long startMS, endMS;
   static unsigned long lastPlayerMS = 0; 
+  static unsigned long lastBuzzerMS = 0;
   static unsigned int fps = 0;
   static int roll = 0;
   static int pitch = 0;
@@ -484,6 +487,9 @@ void loop(void) {
 
   // End of game
   if (g_laps >= MAXLAPS) {
+    #ifdef WITHBUZZER
+    noTone(BUZZERPIN);
+    #endif
     display.setTextSize(2);
     display.setCursor(50,20);
     display.print(F("Fin"));
@@ -516,6 +522,14 @@ void loop(void) {
   // show display buffer on screen
   display.display();
 
+  // Buzzersound
+  #ifdef WITHBUZZER
+  if (millis() - lastBuzzerMS > 50) {
+    if (g_speed < 1) noTone(BUZZERPIN); else tone(BUZZERPIN,50+g_speed*5,10);
+    lastBuzzerMS = millis();
+  }
+  #endif
+  
   // calculate frames per second
   endMS = millis();
   if (endMS - startMS > 0) fps = 1000/(endMS - startMS);
