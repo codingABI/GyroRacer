@@ -1,5 +1,5 @@
 # GyroRacer
-Simple arcade like motorcycling racing game controlled by gyro sensor. Game is short and more a technical demo.
+Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game is short and more a technical demo.
 
 ![screenshot](/assets/images/Screenshot.png) 
 
