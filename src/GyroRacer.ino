@@ -21,7 +21,7 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define BUZZERPIN 5
-#define WITHBUZZER // comment out this line, if you want no sound
+#define USE_BUZZER // comment out this line, if you want no sound
 
 // SSD1306 I2C 
 #define OLED_RESET -1 // no reset pin
@@ -487,7 +487,7 @@ void loop(void) {
 
   // End of game
   if (g_laps >= MAXLAPS) {
-    #ifdef WITHBUZZER
+    #ifdef USE_BUZZER
     noTone(BUZZERPIN);
     #endif
     display.setTextSize(2);
@@ -523,7 +523,7 @@ void loop(void) {
   display.display();
 
   // Buzzersound
-  #ifdef WITHBUZZER
+  #ifdef USE_BUZZER
   if (millis() - lastBuzzerMS > 50) {
     if (g_speed < 1) noTone(BUZZERPIN); else tone(BUZZERPIN,50+g_speed*5,10);
     lastBuzzerMS = millis();
