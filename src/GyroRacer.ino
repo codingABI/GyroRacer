@@ -9,6 +9,7 @@
  * 
  * History:
  * 21.05.2022, Initial version
+ * 22.05.2022, Improve drift in curves, decrease automatic acceleration and increase minimum speed in grass
  */
   
 #include <Adafruit_GFX.h>
@@ -39,6 +40,8 @@ volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has g
 #define STREETBORDER_WIDTH 10 // width of street border
 #define STREET_MINWIDTH 10 // minimum street width on horizont
 #define MAXLAPS 3 // game finishes after MAXLAPS
+#define MAXSPEED 160
+#define GRASSMINSPEED 4
 
 unsigned long g_startMS; // start of game
 unsigned int g_distance; // position on track
@@ -47,7 +50,7 @@ byte g_speed; // speed
 byte g_laps; // number of finished laps
 signed char g_curve; // current curve
 byte g_sprite; // current player sprite
-int g_drift; // drift in curves
+int g_streetMiddle;
 
 #define SPRITEWIDTH 16
 #define SPRITEHEIGHT 16
@@ -204,7 +207,7 @@ void drawScene() {
   unsigned int currentSegmentLenght;
   byte sceneHeight;
   byte currentTrackSegment;
-  static unsigned long lastDriftMS = 0;
+  static unsigned long lastSlowdownMS = 0;
   int grassLeftBegin;
   int grassLeftWidth;
   int grassRightBegin;
@@ -259,7 +262,8 @@ void drawScene() {
     grassRightBegin = currentMiddle+currentStreetBorderWidth+(currentStreetWidth>>1);
     grassRightWidth = SCREEN_WIDTH-grassRightBegin;
 
-    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)) > 0) { // fake "depth" oscillation with phase shifting 
+    // fake "depth" oscillation with phase shifting (based on sin(frequenceScaler * (1.0f - (y/sceneHeight))^3 + distance*phaseshiftScaler) )
+    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)) > 0) { 
       // Solid grass
       if (grassLeftWidth > 0) display.drawFastHLine(grassLeftBegin,y+sceneHeight, grassLeftWidth,SSD1306_WHITE);
       if (grassRightWidth > 0) display.drawFastHLine(grassRightBegin,y+sceneHeight, grassRightWidth,SSD1306_WHITE);
@@ -279,7 +283,8 @@ void drawScene() {
     borderRightBegin = currentMiddle+(currentStreetWidth>>1);
     borderRightWidth = currentStreetBorderWidth;
 
-    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)<<2) > 0) { // fake "depth" oscillation with phase shifting (use 4x faster frequency than grass)
+    // fake "depth" oscillation with phase shifting (use 4x faster frequency than grass)
+    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)<<2) > 0) { 
       display.drawFastHLine(borderLeftBegin,y+sceneHeight,borderLeftWidth,SSD1306_WHITE);
       display.drawFastHLine(borderRightBegin,y+sceneHeight, borderRightWidth,SSD1306_WHITE);      
     };
@@ -302,22 +307,23 @@ void drawScene() {
         display.fillRect(borderLeftBegin,sceneHeight-((y+1)>>1)-1,borderRightBegin-borderLeftBegin+borderRightWidth,(y+1)>>1,SSD1306_WHITE);
       }
     }
-
-    // Drift when not in center of the road
-    if ((millis()-lastDriftMS > 50) && (y == 20)) { 
-      g_drift = (SCREEN_WIDTH>>1) - currentMiddle;
+    if (y == 20) { // player line
+      g_streetMiddle = currentMiddle;
       // Reduce speed in the grass
-      if (((g_playerPos < borderLeftBegin) || (g_playerPos > grassRightBegin - 1))) {
-        if (g_speed > 8) g_speed-=8; else g_speed = 1;
+      if (millis()-lastSlowdownMS > 50) {
+        if (((g_playerPos < borderLeftBegin) || (g_playerPos > grassRightBegin - 1))) {
+          if (g_speed > 11) g_speed-=8; else if (g_speed > GRASSMINSPEED) g_speed = GRASSMINSPEED;
+        }
+        lastSlowdownMS = millis();
       }
-      lastDriftMS = millis();
     }
   } 
 }
 
 // initial game settings
 void resetGame() {
-  g_playerPos = SCREEN_WIDTH/2;
+  g_streetMiddle = SCREEN_WIDTH/2; 
+  g_playerPos = g_streetMiddle;
   g_speed = 0;
   g_laps = 0;
   g_startMS = millis();
@@ -447,38 +453,43 @@ void loop(void) {
       roll = -ypr[2] * 180/M_PI;
     }
   }
-  
+
+  // change player sprite
+  g_sprite  = 0;
+  if (roll < -20) { // tilt to left
+    g_sprite=4;  
+  } else if (roll <- 5) {
+    g_sprite=3;
+  } 
+
+  if (roll > 20) { // tilt to right
+    g_sprite=2;
+  } else if (roll > 5) {
+    g_sprite=1;
+  } 
+   
   // control player every 100ms
   if (millis()-lastPlayerMS>100) {
     // increase/decrease speed
     if (pitch > 10) { // decrease by pitch
       if (g_speed > 1) g_speed--;
     } else { // increase automatically
-      if (g_speed > 140) g_speed+=1; else g_speed+=4;
-      if (g_speed > 160) g_speed = 160;
+      if (g_speed > 140) g_speed++; else g_speed+=2;
+      if (g_speed > MAXSPEED) g_speed = MAXSPEED;
     }
 
-    // Control left/right by roll
-    g_sprite  = 0;
-    g_playerPos += 20*roll/90 + g_drift;
+    // Control left/right by roll    
+    g_playerPos += (20*roll/90)*(1+g_speed/30);
+
+    // Drift in curves
+    if (g_streetMiddle != SCREEN_WIDTH/2) g_playerPos+=(SCREEN_WIDTH/2-g_streetMiddle)*(1+g_speed/60);
+      
     if (g_playerPos < SPRITEWIDTH/2) g_playerPos = SPRITEWIDTH/2;
     if (g_playerPos > SCREEN_WIDTH-SPRITEWIDTH/2-1) g_playerPos = SCREEN_WIDTH-SPRITEWIDTH/2-1;
-    
-    if (roll < -20) { // tilt to left
-      g_sprite=4;  
-      if (g_speed> 100) g_speed-=10; else if (g_speed > 2) g_speed-=2; else g_speed = 1; // reduce speed when tilt
-    } else if (roll <- 5) {
-      g_sprite=3;
-      if (g_speed> 100) g_speed-=5; else if (g_speed > 1) g_speed--; // reduce speed when tilt
-    } 
 
-    if (roll > 20) { // tilt to right
-      g_sprite=2;
-      if (g_speed> 100) g_speed-=10; else if (g_speed > 2) g_speed-=2; else g_speed = 1; // reduce speed when tilt
-    } else if (roll > 5) {
-      g_sprite=1;
-      if (g_speed> 100) g_speed-=5; else if (g_speed > 1) g_speed--; // reduce speed when tilt
-    } 
+    if ((roll <-5) && (g_speed > GRASSMINSPEED)) g_speed--; // reduce speed when tilt left
+    if ((roll > 5) && (g_speed > GRASSMINSPEED)) g_speed--; // reduce speed when tilt right
+
     lastPlayerMS = millis();
   }
 
