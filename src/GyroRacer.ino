@@ -12,13 +12,21 @@
  * 22.05.2022, Improve drift in curves, decrease automatic acceleration and increase minimum speed in grass
  * 24.05.2022, More sprites for player, change tracklist format from start to segment length
  * 25.05.2022, Change tracklist to define type of a segment (curve, finish gate...). Add curve warnings/triangles. Move g_sin128 to PROGMEM to reduce memory consumption
+ * 26.05.2022, Add a demo mode to play the game automatically without a gyroscope sensor
  */
-  
+ 
+// #define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
+
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h> // dont forget to uncomment #define SSD1306_NO_SPLASH in Adafruit_SSD1306.h to free program storage
-#include <I2Cdev.h>
 
+#ifndef DEMOMODE
+
+// we need I2Cdev from https://github.com/jrowberg/i2cdevlib
+#include <I2Cdev.h>
 #include <MPU6050_6Axis_MotionApps20.h> // older, but smaller (~1k) binary than <MPU6050_6Axis_MotionApps612.h>
+
+#endif 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -29,13 +37,22 @@
 // SSD1306 I2C 
 #define OLED_RESET -1 // no reset pin
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#ifndef DEMOMODE
+
 // MPU I2C
 MPU6050 mpu;
-
 #define MPU_INTERRUPT_PIN 2
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
+
+// Interrupthandler for mpu
+void dmpDataReady() {
+  mpuInterrupt = true;
+}
+
+#endif
 
 // Game definitions and variables
 #define STREET_WIDTH 90 // street width at scene bottom, in pixels
@@ -105,7 +122,7 @@ typedef struct {
   byte segmentType; // Bit pattern for segment type
 } trackSegment;
 
-#define TRACKLENGTH 8900 // Sum of all track segments in g_trackSegments (segmentLength100*100 )
+#define TRACKLENGTH 8900 // Sum of all track segments in g_trackSegments (real segmentLenght=segmentLength100*100)
 #define SEGMENTTYPE_DEFAULT 0
 #define SEGMENTTYPE_LEFTCURVE 1
 #define SEGMENTTYPE_RIGHTCURVE 2
@@ -128,11 +145,6 @@ trackSegment g_trackSegments[MAXSEGMENTS] = {
   {20,SEGMENTTYPE_RIGHTCURVE}, // long right curve
   {2,SEGMENTTYPE_FINISHGATE}, // last tracksegment for finish gate
 };
-
-// Interrupthandler for mpu
-void dmpDataReady() {
-  mpuInterrupt = true;
-}
 
 // precalculated sin to improve performance (degree 0-90 with values [0;128])
 const PROGMEM byte g_sin128[91] {
@@ -229,7 +241,7 @@ void drawScene() {
   int borderRightWidth;
   byte currentWidth;
   byte currentHeight;
-
+  
   // half of screen
   sceneHeight = (SCREEN_HEIGHT>>1);
 
@@ -294,7 +306,7 @@ void drawScene() {
       }
       if (grassRightWidth > 0) for (int k=grassRightBegin;k<grassRightBegin+grassRightWidth;k++) {
         if ((k%2+y)%2) display.drawPixel(k,y+sceneHeight,SSD1306_WHITE);
-      }
+      }      
     }
 
     // Draw street border
@@ -404,6 +416,8 @@ void setup(void) {
   //Start I2C
   Wire.begin();
 
+  #ifndef DEMOMODE
+  
   // MPU6050 init
   mpu.initialize();
 
@@ -418,7 +432,9 @@ void setup(void) {
 
   // load and configure the DMP
   devStatus = mpu.dmpInitialize();
-  
+
+  #endif
+
    // OLED init
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Default Address is 0x3D for 128x64, but my OLED uses 0x3C 
     // SSD1306 allocation failed
@@ -437,6 +453,8 @@ void setup(void) {
   display.display();
   display.setTextSize(1);
 
+  #ifndef DEMOMODE
+  
   // Calibration based on IMU_ZERO
   mpu.setXGyroOffset(1907);
   mpu.setYGyroOffset(130);
@@ -475,6 +493,8 @@ void setup(void) {
     if (devStatus==2) { blink(500);blink(500); }
     while (true);
   }
+
+  #endif
   
   resetGame();
 }
@@ -487,15 +507,22 @@ void loop(void) {
   static unsigned int fps = 0;
   static int roll = 0;
   static int pitch = 0;
+
+  #ifndef DEMOMODE
+
   Quaternion q;           // [w, x, y, z]         quaternion container
   VectorFloat gravity;    // [x, y, z]            gravity vector
   float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   uint8_t rc;
-  
+
+  #endif
+
   // record start of frame
   startMS = millis();
 
+  #ifndef DEMOMODE
+  
   // get pitch, roll and yaw from MPU6050
   if (dmpReady) {
     // read a packet from FIFO
@@ -509,6 +536,12 @@ void loop(void) {
       roll = -ypr[2] * 180/M_PI;
     }
   }
+
+  #else
+
+  // Demomode tilt
+  roll=(g_streetMiddle - g_playerPos);
+  #endif
 
   // change player sprite
   g_sprite  = 0;
@@ -533,7 +566,7 @@ void loop(void) {
     }
 
     // Control left/right by roll    
-    g_playerPos += (20*roll/90)*(1+g_speed/30);
+    g_playerPos += (1+g_speed/30)*20*roll/90;
 
     // Drift in curves
     if (g_streetMiddle != SCREEN_WIDTH/2) g_playerPos+=(SCREEN_WIDTH/2-g_streetMiddle)*(1+g_speed/60);
