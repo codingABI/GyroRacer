@@ -13,6 +13,7 @@
  * 24.05.2022, More sprites for player, change tracklist format from start to segment length
  * 25.05.2022, Change tracklist to define type of a segment (curve, finish gate...). Add curve warnings/triangles. Move g_sin128 to PROGMEM to reduce memory consumption
  * 26.05.2022, Add a demo mode to play the game automatically without a gyroscope sensor
+ * 28.05.2022, Add delay for setup in demo mode to show intro text
  */
  
 // #define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
@@ -444,7 +445,8 @@ void setup(void) {
     while (true);
   }
 
-  // Font settings
+  // Intro text
+  display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(2);
   display.setCursor(0,0);
@@ -493,6 +495,10 @@ void setup(void) {
     if (devStatus==2) { blink(500);blink(500); }
     while (true);
   }
+
+  #else
+
+  delay(3000); // start delay in demo mode
 
   #endif
   
@@ -594,7 +600,7 @@ void loop(void) {
     display.setTextSize(1);
     display.setCursor(0,56);
     display.print(F("in "));
-    display.print((millis()-g_startMS)/1000);
+    display.print((millis()-g_startMS)/1000UL);
     display.print(F(" seconds"));
     display.display();
     delay(10000);
