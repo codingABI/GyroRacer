@@ -13,6 +13,7 @@
  * 24.05.2022, More sprites for player, change tracklist format from start to segment length
  * 25.05.2022, Change tracklist to define type of a segment (curve, finish gate...). Add curve warnings/triangles. Move g_sin128 to PROGMEM to reduce memory consumption
  * 26.05.2022, Add a demo mode to play the game automatically without a gyroscope sensor
+ * 27.05.2022, Release version v0.1.0
  * 28.05.2022, Add delay for setup in demo mode to show intro text
  */
  
