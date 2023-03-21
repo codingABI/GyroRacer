@@ -16,6 +16,7 @@
  * 27.05.2022, Release version v0.1.0
  * 28.05.2022, Add delay for setup in demo mode to show intro text
  * 21.03.2023, Make sky movements more realistic
+ * 21.03.2023, Release version v0.2.0
  */
  
 // #define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
