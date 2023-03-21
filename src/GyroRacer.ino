@@ -204,7 +204,7 @@ void drawPlayer() {
 }
 
 void drawSky() {
-  static int currentMiddle = (SCREEN_WIDTH<<2);
+  static byte currentMiddle = 0;
 
   // Move skycenter dependent on curve
   if (g_curve > 0) currentMiddle --;
