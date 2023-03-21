@@ -15,6 +15,7 @@
  * 26.05.2022, Add a demo mode to play the game automatically without a gyroscope sensor
  * 27.05.2022, Release version v0.1.0
  * 28.05.2022, Add delay for setup in demo mode to show intro text
+ * 21.03.2023, Make sky movements more realistic
  */
  
 // #define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
@@ -202,12 +203,12 @@ void drawPlayer() {
   }
 }
 
-// Some stars in the sky
 void drawSky() {
-  int currentMiddle;
+  static int currentMiddle = (SCREEN_WIDTH<<2);
 
-  // center of street for the most far away horizontal line dependent on current curve
-  currentMiddle = (SCREEN_WIDTH>>1)-g_curve;
+  // Move skycenter dependent on curve
+  if (g_curve > 0) currentMiddle --;
+  if (g_curve < 0) currentMiddle ++;
 
   display.drawPixel((currentMiddle -37)&127, 16,SSD1306_WHITE);
   display.drawPixel((currentMiddle +59)&127, 20,SSD1306_WHITE);
@@ -217,7 +218,6 @@ void drawSky() {
   display.drawPixel((currentMiddle -74)&127, 23,SSD1306_WHITE);
   display.drawPixel((currentMiddle +4)&127, 10,SSD1306_WHITE);
   display.drawPixel((currentMiddle +35)&127, 13,SSD1306_WHITE);
-
 }
 
 // draw street on grass (and finish gate and curve warnings if needed)
