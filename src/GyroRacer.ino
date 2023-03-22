@@ -17,9 +17,10 @@
  * 28.05.2022, Add delay for setup in demo mode to show intro text
  * 21.03.2023, Make sky movements more realistic
  * 21.03.2023, Release version v0.2.0
+ * 22.03.2023, Make sky movements dependent on speed
  */
  
-// #define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
+//#define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h> // dont forget to uncomment #define SSD1306_NO_SPLASH in Adafruit_SSD1306.h to free program storage
@@ -204,28 +205,31 @@ void drawPlayer() {
   }
 }
 
+// Some stars in the sky
 void drawSky() {
-  static byte currentMiddle = 0;
+  static byte offset = 0;
+  byte screenOffset;
 
   // Move skycenter dependent on curve
-  if (g_curve > 0) currentMiddle --;
-  if (g_curve < 0) currentMiddle ++;
+  if (g_curve > 0) offset -=(g_speed>>5);
+  if (g_curve < 0) offset +=(g_speed>>5);
 
-  display.drawPixel((currentMiddle -37)&127, 16,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +59)&127, 20,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +13)&127, 15,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +55)&127, 14,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +120)&127, 19,SSD1306_WHITE);
-  display.drawPixel((currentMiddle -74)&127, 23,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +4)&127, 10,SSD1306_WHITE);
-  display.drawPixel((currentMiddle +35)&127, 13,SSD1306_WHITE);
+  screenOffset = (offset>>1);
+  display.drawPixel((screenOffset -37)&127, 16,SSD1306_WHITE);
+  display.drawPixel((screenOffset +59)&127, 20,SSD1306_WHITE);
+  display.drawPixel((screenOffset +13)&127, 15,SSD1306_WHITE);
+  display.drawPixel((screenOffset +55)&127, 14,SSD1306_WHITE);
+  display.drawPixel((screenOffset +120)&127, 19,SSD1306_WHITE);
+  display.drawPixel((screenOffset -74)&127, 23,SSD1306_WHITE);
+  display.drawPixel((screenOffset +4)&127, 10,SSD1306_WHITE);
+  display.drawPixel((screenOffset +35)&127, 13,SSD1306_WHITE);
 }
 
 // draw street on grass (and finish gate and curve warnings if needed)
 void drawScene() {
-  int currentStreetWidth;
-  int currentStreetBorderWidth;
-  int currentMiddle;
+  byte currentStreetWidth;
+  byte currentStreetBorderWidth;
+  byte currentMiddle;
   unsigned int currentSegmentPosition;
   unsigned int currentSegmentLenght;
   unsigned int segmentSum;
@@ -234,14 +238,14 @@ void drawScene() {
   byte currentSegmentType;
   static unsigned long lastSlowdownMS = 0;
   signed char targetCurve;
-  int grassLeftBegin;
-  int grassLeftWidth;
-  int grassRightBegin;
-  int grassRightWidth;
-  int borderLeftBegin;
-  int borderLeftWidth;
-  int borderRightBegin;
-  int borderRightWidth;
+  byte grassLeftBegin;
+  byte grassLeftWidth;
+  byte grassRightBegin;
+  byte grassRightWidth;
+  byte borderLeftBegin;
+  byte borderLeftWidth;
+  byte borderRightBegin;
+  byte borderRightWidth;
   byte currentWidth;
   byte currentHeight;
   
@@ -391,6 +395,7 @@ void drawScene() {
     }
   } 
 }
+
 // initial game settings
 void resetGame() {
   g_streetMiddle = SCREEN_WIDTH/2; 
