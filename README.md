@@ -20,4 +20,4 @@ Running on breadboard was not very stable for me over time (occassionally i2c-bu
 
 ## Player sprite
 
-![Player sprites](/assets/images/PlayerSprite.png) 
+![Player sprite](/assets/images/PlayerSprite.png)
