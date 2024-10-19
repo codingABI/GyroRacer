@@ -19,9 +19,11 @@ Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel displa
 
 Running on breadboard was not very stable for me over time (occassionally i2c-bus freezes). The same circuit soldered on board ran stable.
 
-![schema](/assets/images/Schema.svg) 
-
 # Appendix
+
+## Schematic
+
+![schema](/assets/images/Schema.svg) 
 
 ## Player sprite
 
