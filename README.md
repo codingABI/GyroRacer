@@ -28,6 +28,7 @@ Running on breadboard was not very stable for me over time (occassionally i2c-bu
 ## Used development environment
 
 - Arduino IDE 2.3.4 or 1.8.19
+- Arduino AVR Boards Version 1.8.6
 - Adafruit GFX Library 1.11.11 
 - Adafruit SSD1306 2.5.13 (dont forget to uncomment #define SSD1306_NO_SPLASH in Adafruit_SSD1306.h to prevent the "Sketch too big" error)
 - I2Cdev (from https://github.com/jrowberg/i2cdevlib)
