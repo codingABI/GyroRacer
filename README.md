@@ -10,7 +10,7 @@ Simulation https://wokwi.com/projects/332016926716854868
 Video https://youtu.be/_jVGUhDsQbE
 
 ## License and copyright
-My code is licensed under the terms of the MIT License License [Copyright (c) 2022 codingABI](LICENSE).
+My code is licensed under the terms of the MIT License License [Copyright (c) 2022-2023 codingABI](LICENSE).
 
 ## Hardware
 Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and an optional passive buzzer.
