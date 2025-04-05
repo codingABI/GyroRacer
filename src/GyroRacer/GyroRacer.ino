@@ -81,7 +81,7 @@ signed char g_streetMiddle; // center of street
 #define SPRITEWIDTH 16 // width of sprite, in pixels
 #define SPRITEHEIGHT 16 // height of sprite, in pixels
 
-// sprites made with gimp and converted bye https://javl.github.io/image2cpp/
+// sprites made with gimp and converted by https://javl.github.io/image2cpp/
 #define INDIVIDUALSPRITES 7
 // white pixels for motorcycle sprites
 const PROGMEM byte g_whiteSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT] = {
