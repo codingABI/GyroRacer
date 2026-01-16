@@ -1,9 +1,9 @@
 /*
  * Project: GyroRacer
  * Description: Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game is short and more a technical demo
- * Hardward: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and an optional passive buzzer
+ * Hardware: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and an optional passive buzzer
  * License: MIT License
- * Copyright (c) 2022-2023 codingABI
+ * Copyright (c) 2022-2026 codingABI
  * 
  * created by codingABI https://github.com/codingABI/GyroRacer
  * 
@@ -18,6 +18,7 @@
  * 21.03.2023, Make sky movements more realistic
  * 21.03.2023, Release version v0.2.0
  * 22.03.2023, Make sky movements dependent on speed
+ * 16.01.2026, Fix some spelling errors in comments and names of variables
  */
  
 //#define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
@@ -52,7 +53,7 @@ MPU6050 mpu;
 bool dmpReady = false;  // set true if DMP init was successful
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
 
-// Interrupthandler for mpu
+// Interrupt handler for mpu
 void dmpDataReady() {
   mpuInterrupt = true;
 }
@@ -62,7 +63,7 @@ void dmpDataReady() {
 // Game definitions and variables
 #define STREET_WIDTH 90 // street width at scene bottom, in pixels
 #define STREETBORDER_WIDTH 10 // width of street border at scene bottom, in pixels
-#define STREET_MINWIDTH 10 // minimum street width on horizont, in pixels
+#define STREET_MINWIDTH 10 // minimum street width on horizon, in pixels
 #define MAXLAPS 3 // game finishes after MAXLAPS
 #define MAXSPEED 160 // global max speed
 #define GRASSMINSPEED 4 // Min speed in grass
@@ -123,11 +124,11 @@ const PROGMEM signed char g_spriteOffsetX[INDIVIDUALSPRITES]={0,2,2,3,4,4,5}; //
 
 // track definition
 typedef struct {
-  byte segmentLength100; // Length of segment. Do reduce memory consumtion segmentLength100 is byte and equal real segment lenght / 100
+  byte segmentLength100; // Length of segment. Do reduce memory consumption segmentLength100 is byte and equal real segment length / 100
   byte segmentType; // Bit pattern for segment type
 } trackSegment;
 
-#define TRACKLENGTH 8900 // Sum of all track segments in g_trackSegments (real segmentLenght=segmentLength100*100)
+#define TRACKLENGTH 8900 // Sum of all track segments in g_trackSegments (real segmentLength=segmentLength100*100)
 #define SEGMENTTYPE_DEFAULT 0
 #define SEGMENTTYPE_LEFTCURVE 1
 #define SEGMENTTYPE_RIGHTCURVE 2
@@ -231,7 +232,7 @@ void drawScene() {
   byte currentStreetBorderWidth;
   byte currentMiddle;
   unsigned int currentSegmentPosition;
-  unsigned int currentSegmentLenght;
+  unsigned int currentSegmentLength;
   unsigned int segmentSum;
   byte sceneHeight;
   byte currentTrackSegment;
@@ -259,14 +260,14 @@ void drawScene() {
 
   // get current track segment
   currentTrackSegment = 0;
-  currentSegmentLenght = 0;
+  currentSegmentLength = 0;
   currentSegmentType = SEGMENTTYPE_DEFAULT;
   targetCurve = 0;
   segmentSum = 0;
   for (int i=0;i<MAXSEGMENTS;i++){
     if (g_distance < segmentSum+g_trackSegments[i].segmentLength100*100) { 
       currentTrackSegment = i; 
-      currentSegmentLenght = g_trackSegments[i].segmentLength100*100;
+      currentSegmentLength = g_trackSegments[i].segmentLength100*100;
       currentSegmentType = g_trackSegments[i].segmentType;
 
       if ((g_trackSegments[i].segmentType & SEGMENTTYPE_RIGHTCURVE) == SEGMENTTYPE_RIGHTCURVE) targetCurve = 100;
@@ -330,8 +331,8 @@ void drawScene() {
 
     // finish gate
     if ((currentSegmentType & SEGMENTTYPE_FINISHGATE) == SEGMENTTYPE_FINISHGATE) {
-      // y-position of gate dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLenght-currentSegmentPosition)
-      if ((currentSegmentLenght-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLenght-currentSegmentPosition)))) {
+      // y-position of gate dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
+      if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
         // left pole
         display.drawFastVLine(borderLeftBegin,sceneHeight-1,y+1,SSD1306_WHITE);
         display.drawFastVLine(borderLeftBegin+1,sceneHeight-1,y+1,SSD1306_BLACK);
@@ -349,8 +350,8 @@ void drawScene() {
 
     // right curve warning
     if ((currentSegmentType & SEGMENTTYPE_RIGHTWARNING) == SEGMENTTYPE_RIGHTWARNING) {
-      // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLenght-currentSegmentPosition)
-      if ((currentSegmentLenght-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLenght-currentSegmentPosition)))) {
+      // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
+      if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
         currentWidth = (y+1)*WARNINGWIDTH/sceneHeight;
         if (currentWidth < 4) currentWidth = 4;
         currentHeight = (y+1)*WARNINGHEIGHT/sceneHeight;
@@ -367,8 +368,8 @@ void drawScene() {
 
     // left curve warning
     if ((currentSegmentType & SEGMENTTYPE_LEFTWARNING) == SEGMENTTYPE_LEFTWARNING) {
-      // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLenght-currentSegmentPosition)
-      if ((currentSegmentLenght-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLenght-currentSegmentPosition)))) {        
+      // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
+      if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {        
         currentWidth = (y+1)*WARNINGWIDTH/sceneHeight;
         if (currentWidth < 4) currentWidth = 4;
         currentHeight = (y+1)*WARNINGHEIGHT/sceneHeight;
@@ -554,6 +555,7 @@ void loop(void) {
 
   // Demomode tilt
   roll=(g_streetMiddle - g_playerPos);
+ 
   #endif
 
   // change player sprite
@@ -619,7 +621,7 @@ void loop(void) {
   // draw sky
   drawSky();
 
-  // draw rendered scene
+  // draw scene
   drawScene();
 
   // draw player sprite
