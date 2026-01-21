@@ -4,9 +4,9 @@
  * Hardware: Arduino Uno/Nano with gyroscope sensor MPU6050, SSD1306 OLED 128x64 pixel display and an optional passive buzzer
  * License: MIT License
  * Copyright (c) 2022-2026 codingABI
- * 
+ *
  * created by codingABI https://github.com/codingABI/GyroRacer
- * 
+ *
  * History:
  * 21.05.2022, Initial version
  * 22.05.2022, Improve drift in curves, decrease automatic acceleration and increase minimum speed in grass
@@ -19,8 +19,13 @@
  * 21.03.2023, Release version v0.2.0
  * 22.03.2023, Make sky movements dependent on speed
  * 16.01.2026, Fix some spelling errors in comments and names of variables
+ * 20.01.2026, Limit fps to prevent a too fast game in demo mode or with a faster mce than an ATmega328
+ * 20.01.2026, Define LED_BUILTIN on an ESP32 mcu
+ * 20.01.2026, Use OLED display in case of a MPU/DMU error
+ * 21.01.2026, Fix rare case for wrong curve caused by unsigned/signed byte arithmetic
+ * 21.01.2026, Release version v0.3.0
  */
- 
+
 //#define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
 
 #include <Adafruit_GFX.h>
@@ -32,15 +37,15 @@
 #include <I2Cdev.h>
 #include <MPU6050_6Axis_MotionApps20.h> // older, but smaller (~1k) binary than <MPU6050_6Axis_MotionApps612.h>
 
-#endif 
+#endif
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define BUZZERPIN 5 // Pin of buzzer
-#define USE_BUZZER // comment out this line, if you want no sound
+#define USE_BUZZER // comment out this line, if you do not want sound
 
-// SSD1306 I2C 
+// SSD1306 I2C
 #define OLED_RESET -1 // no reset pin
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -52,6 +57,13 @@ MPU6050 mpu;
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
+
+// Define LED_BUILTIN in special cases
+#ifndef LED_BUILTIN
+#ifdef ESP32
+#define LED_BUILTIN 2 // ESP32 DevKitV1
+#endif
+#endif
 
 // Interrupt handler for mpu
 void dmpDataReady() {
@@ -86,37 +98,37 @@ signed char g_streetMiddle; // center of street
 #define INDIVIDUALSPRITES 7
 // white pixels for motorcycle sprites
 const PROGMEM byte g_whiteSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT] = {
-{ 0x03, 0xc0, 0x02, 0x40, 0x07, 0xe0, 0x0d, 0x70, 0x1a, 0xb8, 0x15, 0x58, 0x3f, 0xec, 0x34, 0x3c, 
+{ 0x03, 0xc0, 0x02, 0x40, 0x07, 0xe0, 0x0d, 0x70, 0x1a, 0xb8, 0x15, 0x58, 0x3f, 0xec, 0x34, 0x3c,
   0x1f, 0xf8, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x08, 0x10, 0x04, 0x20, 0x04, 0x20, 0x03, 0xc0, },
-{ 0x00, 0xe0, 0x03, 0x20, 0x0f, 0xe0, 0x1a, 0xb0, 0x15, 0x58, 0x3f, 0xa8, 0x35, 0xf8, 0x3e, 0x38, 
+{ 0x00, 0xe0, 0x03, 0x20, 0x0f, 0xe0, 0x1a, 0xb0, 0x15, 0x58, 0x3f, 0xa8, 0x35, 0xf8, 0x3e, 0x38,
   0x31, 0xf8, 0x30, 0x30, 0x30, 0x30, 0x10, 0x30, 0x10, 0x20, 0x10, 0x40, 0x0c, 0x80, 0x03, 0x00, },
-{ 0x00, 0x00, 0x00, 0x78, 0x03, 0xc8, 0x06, 0xf8, 0x0d, 0x58, 0x1a, 0xac, 0x1f, 0xd4, 0x1a, 0x6c, 
+{ 0x00, 0x00, 0x00, 0x78, 0x03, 0xc8, 0x06, 0xf8, 0x0d, 0x58, 0x1a, 0xac, 0x1f, 0xd4, 0x1a, 0x6c,
   0x1f, 0x3c, 0x18, 0xfc, 0x10, 0x18, 0x10, 0x38, 0x10, 0x30, 0x10, 0x30, 0x10, 0xc0, 0x0f, 0x80, },
-{ 0x00, 0x00, 0x00, 0x30, 0x00, 0x6c, 0x03, 0xf4, 0x0f, 0x5c, 0x0e, 0xac, 0x0f, 0xd4, 0x1e, 0x6c, 
+{ 0x00, 0x00, 0x00, 0x30, 0x00, 0x6c, 0x03, 0xf4, 0x0f, 0x5c, 0x0e, 0xac, 0x0f, 0xd4, 0x1e, 0x6c,
   0x1b, 0x34, 0x10, 0xec, 0x10, 0x3c, 0x10, 0x38, 0x10, 0x30, 0x10, 0x60, 0x19, 0xc0, 0x07, 0x00, },
-{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x07, 0xf4, 0x0d, 0x5c, 0x0e, 0xac, 0x0f, 0xd4, 0x1a, 0x6c, 
+{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x07, 0xf4, 0x0d, 0x5c, 0x0e, 0xac, 0x0f, 0xd4, 0x1a, 0x6c,
   0x39, 0xb4, 0x30, 0xec, 0x20, 0x7c, 0x20, 0x3c, 0x20, 0x70, 0x30, 0xe0, 0x1b, 0xc0, 0x0e, 0x00, },
-{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xfe, 0x07, 0x5a, 0x0e, 0xae, 0x1f, 0xf6, 
+{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xfe, 0x07, 0x5a, 0x0e, 0xae, 0x1f, 0xf6,
   0x3b, 0x6c, 0x31, 0x34, 0x20, 0xac, 0x60, 0x74, 0x40, 0x3c, 0x60, 0xf8, 0x31, 0xc0, 0x1f, 0x80, },
-{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfe, 0x07, 0xaa, 0x0d, 0x5d, 
+{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfe, 0x07, 0xaa, 0x0d, 0x5d,
   0x1f, 0xef, 0x31, 0x76, 0x21, 0x2c, 0x60, 0xb4, 0x40, 0xec, 0x40, 0x78, 0x20, 0xf8, 0x3f, 0xc0 },
 };
 
 // black pixels for motorcycle sprites
 const PROGMEM byte g_blackSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT] = {
-{ 0x07, 0xe0, 0x07, 0xe0, 0x0f, 0xf0, 0x1f, 0xf8, 0x3f, 0xfc, 0x3f, 0xfc, 0x7f, 0xfe, 0x7f, 0xfe, 
-  0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x1f, 0xf8, 0x0f, 0xf0, 0x0f, 0xf0, 0x07, 0xe0, }, 
-{ 0x03, 0xf0, 0x0f, 0xf0, 0x1f, 0xf0, 0x3f, 0xf8, 0x3f, 0xfc, 0x7f, 0xfc, 0x7f, 0xfc, 0x7f, 0xfc, 
+{ 0x07, 0xe0, 0x07, 0xe0, 0x0f, 0xf0, 0x1f, 0xf8, 0x3f, 0xfc, 0x3f, 0xfc, 0x7f, 0xfe, 0x7f, 0xfe,
+  0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x1f, 0xf8, 0x0f, 0xf0, 0x0f, 0xf0, 0x07, 0xe0, },
+{ 0x03, 0xf0, 0x0f, 0xf0, 0x1f, 0xf0, 0x3f, 0xf8, 0x3f, 0xfc, 0x7f, 0xfc, 0x7f, 0xfc, 0x7f, 0xfc,
   0x7f, 0xfc, 0x7f, 0xf8, 0x7f, 0xf8, 0x3f, 0xf8, 0x3f, 0xf0, 0x3f, 0xe0, 0x1f, 0xc0, 0x0f, 0x80, },
-{ 0x00, 0x78, 0x03, 0xfc, 0x07, 0xfc, 0x0f, 0xfc, 0x1f, 0xfc, 0x3f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfe, 
+{ 0x00, 0x78, 0x03, 0xfc, 0x07, 0xfc, 0x0f, 0xfc, 0x1f, 0xfc, 0x3f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfe,
   0x3f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xf8, 0x3f, 0xf8, 0x3f, 0xf0, 0x1f, 0xc0, },
-{ 0x00, 0x30, 0x00, 0x7c, 0x03, 0xfe, 0x0f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x3f, 0xfe, 
+{ 0x00, 0x30, 0x00, 0x7c, 0x03, 0xfe, 0x0f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x3f, 0xfe,
   0x3f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfe, 0x3f, 0xfc, 0x3f, 0xf8, 0x3f, 0xf0, 0x3f, 0xe0, 0x1f, 0xc0, },
-{ 0x00, 0x00, 0x00, 0x3c, 0x07, 0xfe, 0x0f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x3f, 0xfe, 
+{ 0x00, 0x00, 0x00, 0x3c, 0x07, 0xfe, 0x0f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x1f, 0xfe, 0x3f, 0xfe,
   0x7f, 0xfe, 0x7f, 0xfe, 0x7f, 0xfe, 0x7f, 0xfe, 0x7f, 0xfc, 0x7f, 0xf0, 0x3f, 0xe0, 0x1f, 0xc0, },
-{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xfe, 0x0f, 0xff, 0x0f, 0xff, 0x1f, 0xff, 0x3f, 0xff, 
+{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xfe, 0x0f, 0xff, 0x0f, 0xff, 0x1f, 0xff, 0x3f, 0xff,
   0x7f, 0xfe, 0x7f, 0xfe, 0x7f, 0xfe, 0xff, 0xfe, 0xff, 0xfe, 0xff, 0xfc, 0x7f, 0xf8, 0x3f, 0xc0, },
-{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfe, 0x07, 0xff, 0x0f, 0xff, 0x1f, 0xff, 
+{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfe, 0x07, 0xff, 0x0f, 0xff, 0x1f, 0xff,
   0x3f, 0xff, 0x7f, 0xff, 0x7f, 0xfe, 0xff, 0xfe, 0xff, 0xfe, 0xff, 0xfc, 0x7f, 0xfc, 0x7f, 0xf8}
 };
 
@@ -147,7 +159,7 @@ trackSegment g_trackSegments[MAXSEGMENTS] = {
   {5,SEGMENTTYPE_DEFAULT}, // straight on
   {7,SEGMENTTYPE_LEFTWARNING}, // left warning
   {10,SEGMENTTYPE_LEFTCURVE}, // left
-  {7,SEGMENTTYPE_RIGHTWARNING}, // right warning  
+  {7,SEGMENTTYPE_RIGHTWARNING}, // right warning
   {20,SEGMENTTYPE_RIGHTCURVE}, // long right curve
   {2,SEGMENTTYPE_FINISHGATE}, // last tracksegment for finish gate
 };
@@ -175,7 +187,7 @@ void drawPlayer() {
 
   displayBeginX = g_playerPos - (SPRITEWIDTH>>1);
   displayBeginY = SCREEN_HEIGHT - SPRITEHEIGHT - 4;
-  
+
   internalSpriteNbr = g_sprite;
   if (g_sprite > INDIVIDUALSPRITES-1) {
     internalSpriteNbr-=(INDIVIDUALSPRITES-1); // sprite number 7-12 and higher are only mirrored 1-6
@@ -193,12 +205,12 @@ void drawPlayer() {
         if (valueWhite & (0b10000000>>k)) {
           if (g_sprite > INDIVIDUALSPRITES-1) // mirror sprite
             display.drawPixel(displayBeginX+SPRITEWIDTH-((j<<3)+k)-1,displayBeginY+i,SSD1306_WHITE);
-          else 
+          else
             display.drawPixel(displayBeginX+(j<<3)+k,displayBeginY+i,SSD1306_WHITE);
         } else if (valueBlack & (0b10000000>>k)) {
           if (g_sprite > INDIVIDUALSPRITES-1) // mirror sprite
             display.drawPixel(displayBeginX+SPRITEWIDTH-((j<<3)+k)-1,displayBeginY+i,SSD1306_BLACK);
-          else 
+          else
             display.drawPixel(displayBeginX+(j<<3)+k,displayBeginY+i,SSD1306_BLACK);
         }
       }
@@ -249,7 +261,7 @@ void drawScene() {
   byte borderRightWidth;
   byte currentWidth;
   byte currentHeight;
-  
+
   // half of screen
   sceneHeight = (SCREEN_HEIGHT>>1);
 
@@ -265,8 +277,8 @@ void drawScene() {
   targetCurve = 0;
   segmentSum = 0;
   for (int i=0;i<MAXSEGMENTS;i++){
-    if (g_distance < segmentSum+g_trackSegments[i].segmentLength100*100) { 
-      currentTrackSegment = i; 
+    if (g_distance < segmentSum+g_trackSegments[i].segmentLength100*100) {
+      currentTrackSegment = i;
       currentSegmentLength = g_trackSegments[i].segmentLength100*100;
       currentSegmentType = g_trackSegments[i].segmentType;
 
@@ -276,24 +288,25 @@ void drawScene() {
       currentSegmentPosition = g_distance-segmentSum;
       break;
     }
-    segmentSum+=g_trackSegments[i].segmentLength100*100;    
+    segmentSum+=g_trackSegments[i].segmentLength100*100;
   }
 
   // align curve to target curve of segment
-  if (g_curve < targetCurve) {
-    g_curve+=g_speed>>2;
-    if (g_curve > targetCurve) g_curve = targetCurve;
+  int newCurve = g_curve;
+  if (newCurve < targetCurve) {
+    newCurve+=g_speed>>2;
+    if (newCurve > targetCurve) g_curve = targetCurve; else g_curve = newCurve;
   }
-  if (g_curve > targetCurve) {
-    g_curve-=g_speed>>2;
-    if (g_curve < targetCurve) g_curve = targetCurve;
+  if (newCurve > targetCurve) {
+    newCurve-=g_speed>>2;
+    if (newCurve < targetCurve) g_curve = targetCurve; else g_curve = newCurve;
   }
   for (int y=0;y<sceneHeight;y++) { // for each line in lower screen half
     // center of the road dependent on curve and fake "depth"
     currentMiddle = (SCREEN_WIDTH>>1)+g_curve/(y+1);
 
     // width of street and border dependent on fake "depth"
-    currentStreetWidth = ((STREET_WIDTH*(y+1)) >> 5)+STREET_MINWIDTH; 
+    currentStreetWidth = ((STREET_WIDTH*(y+1)) >> 5)+STREET_MINWIDTH;
     currentStreetBorderWidth = (STREETBORDER_WIDTH*(y+1)) >> 5;
 
     // Draw grass
@@ -303,7 +316,7 @@ void drawScene() {
     grassRightWidth = SCREEN_WIDTH-grassRightBegin;
 
     // fake "depth" oscillation with phase shifting (based on sin(frequenceScaler * (1.0f - (y/sceneHeight))^3 + distance*phaseshiftScaler) )
-    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)) > 0) { 
+    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)) > 0) {
       // Solid grass
       if (grassLeftWidth > 0) display.drawFastHLine(grassLeftBegin,y+sceneHeight, grassLeftWidth,SSD1306_WHITE);
       if (grassRightWidth > 0) display.drawFastHLine(grassRightBegin,y+sceneHeight, grassRightWidth,SSD1306_WHITE);
@@ -314,7 +327,7 @@ void drawScene() {
       }
       if (grassRightWidth > 0) for (int k=grassRightBegin;k<grassRightBegin+grassRightWidth;k++) {
         if ((k%2+y)%2) display.drawPixel(k,y+sceneHeight,SSD1306_WHITE);
-      }      
+      }
     }
 
     // Draw street border
@@ -324,9 +337,9 @@ void drawScene() {
     borderRightWidth = currentStreetBorderWidth;
 
     // fake "depth" oscillation with phase shifting (use 4x faster frequency than grass)
-    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)<<2) > 0) { 
+    if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)<<2) > 0) {
       display.drawFastHLine(borderLeftBegin,y+sceneHeight,borderLeftWidth,SSD1306_WHITE);
-      display.drawFastHLine(borderRightBegin,y+sceneHeight, borderRightWidth,SSD1306_WHITE);      
+      display.drawFastHLine(borderRightBegin,y+sceneHeight, borderRightWidth,SSD1306_WHITE);
     };
 
     // finish gate
@@ -369,7 +382,7 @@ void drawScene() {
     // left curve warning
     if ((currentSegmentType & SEGMENTTYPE_LEFTWARNING) == SEGMENTTYPE_LEFTWARNING) {
       // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
-      if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {        
+      if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
         currentWidth = (y+1)*WARNINGWIDTH/sceneHeight;
         if (currentWidth < 4) currentWidth = 4;
         currentHeight = (y+1)*WARNINGHEIGHT/sceneHeight;
@@ -394,12 +407,12 @@ void drawScene() {
         lastSlowdownMS = millis();
       }
     }
-  } 
+  }
 }
 
 // initial game settings
 void resetGame() {
-  g_streetMiddle = SCREEN_WIDTH/2; 
+  g_streetMiddle = SCREEN_WIDTH/2;
   g_playerPos = g_streetMiddle;
   g_speed = 0;
   g_laps = 0;
@@ -425,34 +438,14 @@ void setup(void) {
   //Start I2C
   Wire.begin();
 
-  #ifndef DEMOMODE
-  
-  // MPU6050 init
-  mpu.initialize();
-
-  pinMode(MPU_INTERRUPT_PIN, INPUT);
- 
-  // verify connection
-  if (!mpu.testConnection()) {
-    // MPU6050 connection failed
-    blink(1000);
-    while (true);
-  }
-
-  // load and configure the DMP
-  devStatus = mpu.dmpInitialize();
-
-  #endif
-
-   // OLED init
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Default Address is 0x3D for 128x64, but my OLED uses 0x3C 
+  // OLED init
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Default Address is 0x3D for 128x64, but my OLED uses 0x3C
     // SSD1306 allocation failed
     blink(1000);
     blink(1000);
     blink(1000);
     while (true);
   }
-
   // Intro text
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
@@ -461,42 +454,41 @@ void setup(void) {
   display.println(F("3 fast"));
   display.print(F("laps..."));
   display.display();
-  display.setTextSize(1);
 
   #ifndef DEMOMODE
-  
-  // Calibration based on IMU_ZERO
-  mpu.setXGyroOffset(1907);
-  mpu.setYGyroOffset(130);
-  mpu.setZGyroOffset(-1);
-  mpu.setXAccelOffset(-647);
-  mpu.setYAccelOffset(-3985);  
-  mpu.setZAccelOffset(-4111);
 
-  // make sure it worked (returns 0 if so)
-  if (devStatus == 0) {
-    // Calibration Time: generate offsets and calibrate our MPU6050
-    mpu.CalibrateAccel(6);
-    mpu.CalibrateGyro(6);
-    // turn on the DMP, now that it's ready
-    mpu.setDMPEnabled(true);
+  // MPU6050 init
+  mpu.initialize();
 
-    // enable Arduino interrupt detection
-    attachInterrupt(digitalPinToInterrupt(MPU_INTERRUPT_PIN), dmpDataReady, RISING);
-    mpuIntStatus = mpu.getIntStatus();
+  pinMode(MPU_INTERRUPT_PIN, INPUT);
 
-    // set our DMP Ready flag so the main loop() function knows it's okay to use it
-    dmpReady = true;
+  // verify connection
+  if (!mpu.testConnection()) {
+    // MPU6050 connection failed
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print(F("MPU failed"));
+    display.display();
+    blink(1000);
+    while (true);
+  }
 
-    // get expected DMP packet size for later comparison
-    packetSize = mpu.dmpGetFIFOPacketSize();
-  } else {
+  // load and configure the DMP
+  devStatus = mpu.dmpInitialize();
+
+  if (devStatus != 0) {
     // ERROR!
     // 1 = initial memory load failed
     // 2 = DMP configuration updates failed
     // (if it's going to break, usually the code will be 1)
 
     // DMP Initialization failed
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.println(F("DMP failed"));
+    display.print(F("Status "));
+    display.print(devStatus);
+    display.display();
     blink(1000);
     blink(1000);
     if (devStatus==1) blink(500);
@@ -504,19 +496,46 @@ void setup(void) {
     while (true);
   }
 
+  // Calibration based on IMU_ZERO
+  mpu.setXGyroOffset(1907);
+  mpu.setYGyroOffset(130);
+  mpu.setZGyroOffset(-1);
+  mpu.setXAccelOffset(-647);
+  mpu.setYAccelOffset(-3985);
+  mpu.setZAccelOffset(-4111);
+
+  // Calibration Time: generate offsets and calibrate our MPU6050
+  mpu.CalibrateAccel(6);
+  mpu.CalibrateGyro(6);
+  // turn on the DMP, now that it's ready
+  mpu.setDMPEnabled(true);
+
+  // enable Arduino interrupt detection
+  attachInterrupt(digitalPinToInterrupt(MPU_INTERRUPT_PIN), dmpDataReady, RISING);
+  mpuIntStatus = mpu.getIntStatus();
+
+  // set our DMP Ready flag so the main loop() function knows it's okay to use it
+  dmpReady = true;
+
+  // get expected DMP packet size for later comparison
+  packetSize = mpu.dmpGetFIFOPacketSize();
+
   #else
 
   delay(3000); // start delay in demo mode
 
   #endif
-  
+
   resetGame();
+
+  // Small text size for next outputs
+  display.setTextSize(1);
 }
 
 void loop(void) {
   char strData[24];
   unsigned long startMS, endMS;
-  static unsigned long lastPlayerMS = 0; 
+  static unsigned long lastPlayerMS = 0;
   static unsigned long lastBuzzerMS = 0;
   static unsigned int fps = 0;
   static int roll = 0;
@@ -536,13 +555,13 @@ void loop(void) {
   startMS = millis();
 
   #ifndef DEMOMODE
-  
+
   // get pitch, roll and yaw from MPU6050
   if (dmpReady) {
     // read a packet from FIFO
-    rc = mpu.dmpGetCurrentFIFOPacket(fifoBuffer); 
+    rc = mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
 
-    if (rc) { // Get the Latest packet 
+    if (rc) { // Get the Latest packet
       mpu.dmpGetQuaternion(&q, fifoBuffer);
       mpu.dmpGetGravity(&gravity, &q);
       mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
@@ -555,19 +574,19 @@ void loop(void) {
 
   // Demomode tilt
   roll=(g_streetMiddle - g_playerPos);
- 
+
   #endif
 
   // change player sprite
   g_sprite  = 0;
-  
+
   if (roll < -1) { // tilt to left
     g_sprite=INDIVIDUALSPRITES-(roll>>3);
-    if (g_sprite > (INDIVIDUALSPRITES<<1)-2) g_sprite = (INDIVIDUALSPRITES<<1)-2;  
+    if (g_sprite > (INDIVIDUALSPRITES<<1)-2) g_sprite = (INDIVIDUALSPRITES<<1)-2;
   }
   if (roll > 1) { // tilt to right
     g_sprite=1+(roll>>3);
-    if (g_sprite > INDIVIDUALSPRITES-1) g_sprite=INDIVIDUALSPRITES-1;    
+    if (g_sprite > INDIVIDUALSPRITES-1) g_sprite=INDIVIDUALSPRITES-1;
   }
 
   // control player every 100ms
@@ -580,12 +599,12 @@ void loop(void) {
       if (g_speed > MAXSPEED) g_speed = MAXSPEED;
     }
 
-    // Control left/right by roll    
+    // Control left/right by roll
     g_playerPos += (1+g_speed/30)*20*roll/90;
 
     // Drift in curves
     if (g_streetMiddle != SCREEN_WIDTH/2) g_playerPos+=(SCREEN_WIDTH/2-g_streetMiddle)*(1+g_speed/60);
-      
+
     if (g_playerPos < SPRITEWIDTH/2) g_playerPos = SPRITEWIDTH/2;
     if (g_playerPos > SCREEN_WIDTH-SPRITEWIDTH/2-1) g_playerPos = SCREEN_WIDTH-SPRITEWIDTH/2-1;
 
@@ -616,7 +635,7 @@ void loop(void) {
     // start again
     display.clearDisplay();
     resetGame();
-  } 
+  }
 
   // draw sky
   drawSky();
@@ -642,8 +661,11 @@ void loop(void) {
     lastBuzzerMS = millis();
   }
   #endif
-  
-  // calculate frames per second
-  endMS = millis();
+
+  // Limit frames per second to 15 ftps to prevent a too fast game (e.g. in demo mode or with a mcu faster than an ATmega328)
+  do {
+    endMS = millis();
+  } while (endMS-startMS<66);
+  // Calculate frames per second
   if (endMS - startMS > 0) fps = 1000/(endMS - startMS);
 }
