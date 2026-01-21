@@ -58,18 +58,18 @@ MPU6050 mpu;
 bool dmpReady = false;  // set true if DMP init was successful
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
 
-// Define LED_BUILTIN in special cases
-#ifndef LED_BUILTIN
-#ifdef ESP32
-#define LED_BUILTIN 2 // ESP32 DevKitV1
-#endif
-#endif
-
 // Interrupt handler for mpu
 void dmpDataReady() {
   mpuInterrupt = true;
 }
 
+#endif
+
+// Define LED_BUILTIN in special cases
+#ifndef LED_BUILTIN
+#ifdef ESP32
+#define LED_BUILTIN 2 // ESP32 DevKitV1
+#endif
 #endif
 
 // Game definitions and variables
