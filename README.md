@@ -5,9 +5,9 @@ Simple arcade like motorcycling racing game controlled by gyroscope sensor. Game
 
 ![capture](/assets/images/Capture.gif) 
 
-Simulation https://wokwi.com/projects/332016926716854868
+Online simulation on [Wokwi](https://wokwi.com/projects/332016926716854868)
 
-Video https://youtu.be/_jVGUhDsQbE
+Watch version 0.1.0 on [Youtube](https://youtu.be/_jVGUhDsQbE)
 
 ## License and copyright
 My code is licensed under the terms of the MIT License [Copyright (c) 2022-2026 codingABI](LICENSE).
@@ -24,6 +24,8 @@ Running on breadboard was not very stable for me over time (occasionally i2c-bus
 ## Schematic
 
 ![schema](/assets/images/Schema.svg) 
+
+The interrupt line between MPU6050 pin "INT" and Arduino pin "D2" is currently not used in my code and the device should work without connecting these pins.
 
 ## Used development environment
 

@@ -24,18 +24,20 @@
  * 20.01.2026, Use OLED display in case of a MPU/DMU error
  * 21.01.2026, Fix rare case for wrong curve caused by unsigned/signed byte arithmetic
  * 21.01.2026, Release version v0.3.0
+ * 23.01.2026, Add start signal sequence
+ * 23.01.2026, Release version v1.0.0
  */
 
-//#define DEMOMODE // uncomment this line, if you want only the demo mode without a gyroscope sensor
+//#define DEMOMODE // Uncomment this line, if you want only the demo mode without a gyroscope sensor
 
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h> // dont forget to uncomment #define SSD1306_NO_SPLASH in Adafruit_SSD1306.h to free program storage
+#include <Adafruit_SSD1306.h> // Dont forget to uncomment #define SSD1306_NO_SPLASH in Adafruit_SSD1306.h to free program storage
 
 #ifndef DEMOMODE
 
-// we need I2Cdev from https://github.com/jrowberg/i2cdevlib
+// We need I2Cdev from https://github.com/jrowberg/i2cdevlib
 #include <I2Cdev.h>
-#include <MPU6050_6Axis_MotionApps20.h> // older, but smaller (~1k) binary than <MPU6050_6Axis_MotionApps612.h>
+#include <MPU6050_6Axis_MotionApps20.h> // Older, but smaller (~1k) binary than <MPU6050_6Axis_MotionApps612.h>
 
 #endif
 
@@ -43,25 +45,15 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define BUZZERPIN 5 // Pin of buzzer
-#define USE_BUZZER // comment out this line, if you do not want sound
+#define USE_BUZZER // Comment out this line, if you do not need sound
 
 // SSD1306 I2C
-#define OLED_RESET -1 // no reset pin
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 
 #ifndef DEMOMODE
 
 // MPU I2C
 MPU6050 mpu;
-#define MPU_INTERRUPT_PIN 2
-// MPU control/status vars
-bool dmpReady = false;  // set true if DMP init was successful
-volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
-
-// Interrupt handler for mpu
-void dmpDataReady() {
-  mpuInterrupt = true;
-}
 
 #endif
 
@@ -73,30 +65,30 @@ void dmpDataReady() {
 #endif
 
 // Game definitions and variables
-#define STREET_WIDTH 90 // street width at scene bottom, in pixels
-#define STREETBORDER_WIDTH 10 // width of street border at scene bottom, in pixels
-#define STREET_MINWIDTH 10 // minimum street width on horizon, in pixels
-#define MAXLAPS 3 // game finishes after MAXLAPS
-#define MAXSPEED 160 // global max speed
+#define STREET_WIDTH 90 // Street width at scene bottom, in pixels
+#define STREETBORDER_WIDTH 10 // Width of street border at scene bottom, in pixels
+#define STREET_MINWIDTH 10 // Minimum street width on horizon, in pixels
+#define MAXLAPS 3 // Game finishes after MAXLAPS
+#define MAXSPEED 160 // Global max speed
 #define GRASSMINSPEED 4 // Min speed in grass
-#define WARNINGWIDTH 16 // width of direction arrow at scene bottom, in pixels
-#define WARNINGHEIGHT 16 // height of direction arrow at scene bottom, in pixels
+#define WARNINGWIDTH 16 // Width of direction arrow at scene bottom, in pixels
+#define WARNINGHEIGHT 16 // Height of direction arrow at scene bottom, in pixels
 
-unsigned long g_startMS; // start of game
-unsigned int g_distance; // position on track
-int g_playerPos; // horizontal position of player
-byte g_speed; // current speed
-byte g_laps; // number of finished laps
-signed char g_curve; // current curve
-byte g_sprite; // current player sprite
-signed char g_streetMiddle; // center of street
+unsigned long g_startMS; // Start of game time
+unsigned int g_distance; // Current position on track
+int g_playerPos; // Horizontal position of player
+byte g_speed; // Current speed
+byte g_laps; // Number of finished laps
+signed char g_curve; // Current curve
+byte g_sprite; // Current player sprite
+signed char g_streetMiddle; // Center of street
 
 #define SPRITEWIDTH 16 // width of sprite, in pixels
 #define SPRITEHEIGHT 16 // height of sprite, in pixels
 
-// sprites made with gimp and converted by https://javl.github.io/image2cpp/
+// Sprites made with gimp and converted by https://javl.github.io/image2cpp/
 #define INDIVIDUALSPRITES 7
-// white pixels for motorcycle sprites
+// White pixels for motorcycle sprites
 const PROGMEM byte g_whiteSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT] = {
 { 0x03, 0xc0, 0x02, 0x40, 0x07, 0xe0, 0x0d, 0x70, 0x1a, 0xb8, 0x15, 0x58, 0x3f, 0xec, 0x34, 0x3c,
   0x1f, 0xf8, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x08, 0x10, 0x04, 0x20, 0x04, 0x20, 0x03, 0xc0, },
@@ -114,7 +106,7 @@ const PROGMEM byte g_whiteSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT
   0x1f, 0xef, 0x31, 0x76, 0x21, 0x2c, 0x60, 0xb4, 0x40, 0xec, 0x40, 0x78, 0x20, 0xf8, 0x3f, 0xc0 },
 };
 
-// black pixels for motorcycle sprites
+// Black pixels for motorcycle sprites
 const PROGMEM byte g_blackSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT] = {
 { 0x07, 0xe0, 0x07, 0xe0, 0x0f, 0xf0, 0x1f, 0xf8, 0x3f, 0xfc, 0x3f, 0xfc, 0x7f, 0xfe, 0x7f, 0xfe,
   0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x1f, 0xf8, 0x0f, 0xf0, 0x0f, 0xf0, 0x07, 0xe0, },
@@ -134,7 +126,7 @@ const PROGMEM byte g_blackSprites [INDIVIDUALSPRITES][SPRITEWIDTH/8*SPRITEHEIGHT
 
 const PROGMEM signed char g_spriteOffsetX[INDIVIDUALSPRITES]={0,2,2,3,4,4,5}; // x-offset for sprites
 
-// track definition
+// Track definition
 typedef struct {
   byte segmentLength100; // Length of segment. Do reduce memory consumption segmentLength100 is byte and equal real segment length / 100
   byte segmentType; // Bit pattern for segment type
@@ -150,26 +142,26 @@ typedef struct {
 
 #define MAXSEGMENTS 12
 trackSegment g_trackSegments[MAXSEGMENTS] = {
-  {5,SEGMENTTYPE_DEFAULT}, // straight on
-  {7,SEGMENTTYPE_RIGHTWARNING}, // right warning
-  {10,SEGMENTTYPE_RIGHTCURVE}, // right
-  {12,SEGMENTTYPE_DEFAULT}, // straight on
-  {2,SEGMENTTYPE_LEFTCURVE}, // short curve change
-  {2,SEGMENTTYPE_RIGHTCURVE}, // short curve change
-  {5,SEGMENTTYPE_DEFAULT}, // straight on
-  {7,SEGMENTTYPE_LEFTWARNING}, // left warning
-  {10,SEGMENTTYPE_LEFTCURVE}, // left
-  {7,SEGMENTTYPE_RIGHTWARNING}, // right warning
-  {20,SEGMENTTYPE_RIGHTCURVE}, // long right curve
-  {2,SEGMENTTYPE_FINISHGATE}, // last tracksegment for finish gate
+  {5,SEGMENTTYPE_DEFAULT}, // Straight on
+  {7,SEGMENTTYPE_RIGHTWARNING}, // Right warning
+  {10,SEGMENTTYPE_RIGHTCURVE}, // Right
+  {12,SEGMENTTYPE_DEFAULT}, // Straight on
+  {2,SEGMENTTYPE_LEFTCURVE}, // Short curve change
+  {2,SEGMENTTYPE_RIGHTCURVE}, // Short curve change
+  {5,SEGMENTTYPE_DEFAULT}, // Straight on
+  {7,SEGMENTTYPE_LEFTWARNING}, // Left warning
+  {10,SEGMENTTYPE_LEFTCURVE}, // Left
+  {7,SEGMENTTYPE_RIGHTWARNING}, // Right warning
+  {20,SEGMENTTYPE_RIGHTCURVE}, // Long right curve
+  {2,SEGMENTTYPE_FINISHGATE}, // Last tracksegment for finish gate
 };
 
-// precalculated sin to improve performance (degree 0-90 with values [0;128])
+// Precalculated sin to improve performance (degree 0-90 with values [0;128])
 const PROGMEM byte g_sin128[91] {
   0,2,4,7,9,11,13,16,18,20,22,24,27,29,31,33,35,37,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,73,75,77,79,81,82,84,86,87,89,91,92,94,95,97,98,99,101,102,104,105,106,107,109,110,111,112,113,114,115,116,117,118,119,119,120,121,122,122,123,124,124,125,125,126,126,126,127,127,127,128,128,128,128,128,128
 };
 
-// function to get precalculated sins (return values [-128;128])
+// Function to get precalculated sins (return values [-128;128])
 int sin128(int degree) {
   degree = degree % 360;
   if (degree < 0) degree+=360;
@@ -179,7 +171,7 @@ int sin128(int degree) {
   return -(int) pgm_read_byte_near(&g_sin128[360-degree]);
 }
 
-// draw player sprite
+// Draw player sprite
 void drawPlayer() {
   int  displayBeginX, displayBeginY;
   byte valueWhite, valueBlack;
@@ -190,25 +182,25 @@ void drawPlayer() {
 
   internalSpriteNbr = g_sprite;
   if (g_sprite > INDIVIDUALSPRITES-1) {
-    internalSpriteNbr-=(INDIVIDUALSPRITES-1); // sprite number 7-12 and higher are only mirrored 1-6
+    internalSpriteNbr-=(INDIVIDUALSPRITES-1); // Sprite number 7-12 and higher are only mirrored 1-6
     displayBeginX-=pgm_read_byte_near(&(g_spriteOffsetX[internalSpriteNbr]));
   } else {
     displayBeginX+=pgm_read_byte_near(&(g_spriteOffsetX[internalSpriteNbr]));
   }
 
   // Draw sprite pixels
-  for (int i=0;i<SPRITEHEIGHT;i++) { // every sprite line
-    for (int j=0;j<2;j++) { // every 8 pixel per line (<SPRITEWIDTH/8)
+  for (int i=0;i<SPRITEHEIGHT;i++) { // Every sprite line
+    for (int j=0;j<2;j++) { // Every 8 pixel per line (<SPRITEWIDTH/8)
       valueWhite = pgm_read_byte_near(&(g_whiteSprites[internalSpriteNbr][(i<<1) + j])); // ..][i * (SPRITEWIDTH/8) + j]
       valueBlack = pgm_read_byte_near(&(g_blackSprites[internalSpriteNbr][(i<<1) + j]));
-      for (int k=0;k<8;k++) { // check bits from msb to lsb
+      for (int k=0;k<8;k++) { // Check bits from msb to lsb
         if (valueWhite & (0b10000000>>k)) {
-          if (g_sprite > INDIVIDUALSPRITES-1) // mirror sprite
+          if (g_sprite > INDIVIDUALSPRITES-1) // Mirror sprite
             display.drawPixel(displayBeginX+SPRITEWIDTH-((j<<3)+k)-1,displayBeginY+i,SSD1306_WHITE);
           else
             display.drawPixel(displayBeginX+(j<<3)+k,displayBeginY+i,SSD1306_WHITE);
         } else if (valueBlack & (0b10000000>>k)) {
-          if (g_sprite > INDIVIDUALSPRITES-1) // mirror sprite
+          if (g_sprite > INDIVIDUALSPRITES-1) // Mirror sprite
             display.drawPixel(displayBeginX+SPRITEWIDTH-((j<<3)+k)-1,displayBeginY+i,SSD1306_BLACK);
           else
             display.drawPixel(displayBeginX+(j<<3)+k,displayBeginY+i,SSD1306_BLACK);
@@ -238,7 +230,7 @@ void drawSky() {
   display.drawPixel((screenOffset +35)&127, 13,SSD1306_WHITE);
 }
 
-// draw street on grass (and finish gate and curve warnings if needed)
+// Draw street on grass (and finish gate and curve warnings if needed)
 void drawScene() {
   byte currentStreetWidth;
   byte currentStreetBorderWidth;
@@ -262,15 +254,15 @@ void drawScene() {
   byte currentWidth;
   byte currentHeight;
 
-  // half of screen
+  // Half of screen
   sceneHeight = (SCREEN_HEIGHT>>1);
 
-  // increase player distance dependent on speed
-  g_distance+=g_speed>>2; // increase by 1/4th of speed
-  if (g_distance >= TRACKLENGTH) g_laps++; // count laps when finished
-  g_distance = g_distance % TRACKLENGTH; // modulo distance to complete track length
+  // Increase player distance dependent on speed
+  g_distance+=g_speed>>2; // Increase by 1/4th of speed
+  if (g_distance >= TRACKLENGTH) g_laps++; // Count laps when finished
+  g_distance = g_distance % TRACKLENGTH; // Modulo distance to complete track length
 
-  // get current track segment
+  // Get current track segment
   currentTrackSegment = 0;
   currentSegmentLength = 0;
   currentSegmentType = SEGMENTTYPE_DEFAULT;
@@ -291,7 +283,7 @@ void drawScene() {
     segmentSum+=g_trackSegments[i].segmentLength100*100;
   }
 
-  // align curve to target curve of segment
+  // Align curve to target curve of segment
   int newCurve = g_curve;
   if (newCurve < targetCurve) {
     newCurve+=g_speed>>2;
@@ -301,11 +293,11 @@ void drawScene() {
     newCurve-=g_speed>>2;
     if (newCurve < targetCurve) g_curve = targetCurve; else g_curve = newCurve;
   }
-  for (int y=0;y<sceneHeight;y++) { // for each line in lower screen half
-    // center of the road dependent on curve and fake "depth"
+  for (int y=0;y<sceneHeight;y++) { // For each line in lower screen half
+    // Center of the road dependent on curve and fake "depth"
     currentMiddle = (SCREEN_WIDTH>>1)+g_curve/(y+1);
 
-    // width of street and border dependent on fake "depth"
+    // Width of street and border dependent on fake "depth"
     currentStreetWidth = ((STREET_WIDTH*(y+1)) >> 5)+STREET_MINWIDTH;
     currentStreetBorderWidth = (STREETBORDER_WIDTH*(y+1)) >> 5;
 
@@ -315,7 +307,7 @@ void drawScene() {
     grassRightBegin = currentMiddle+currentStreetBorderWidth+(currentStreetWidth>>1);
     grassRightWidth = SCREEN_WIDTH-grassRightBegin;
 
-    // fake "depth" oscillation with phase shifting (based on sin(frequenceScaler * (1.0f - (y/sceneHeight))^3 + distance*phaseshiftScaler) )
+    // Fake "depth" oscillation with phase shifting (based on sin(frequenceScaler * (1.0f - (y/sceneHeight))^3 + distance*phaseshiftScaler) )
     if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)) > 0) {
       // Solid grass
       if (grassLeftWidth > 0) display.drawFastHLine(grassLeftBegin,y+sceneHeight, grassLeftWidth,SSD1306_WHITE);
@@ -336,32 +328,32 @@ void drawScene() {
     borderRightBegin = currentMiddle+(currentStreetWidth>>1);
     borderRightWidth = currentStreetBorderWidth;
 
-    // fake "depth" oscillation with phase shifting (use 4x faster frequency than grass)
+    // Fake "depth" oscillation with phase shifting (use 4x faster frequency than grass)
     if (sin128(((((31-y)*(31-y)*(31-y))>>5) + g_distance)<<2) > 0) {
       display.drawFastHLine(borderLeftBegin,y+sceneHeight,borderLeftWidth,SSD1306_WHITE);
       display.drawFastHLine(borderRightBegin,y+sceneHeight, borderRightWidth,SSD1306_WHITE);
     };
 
-    // finish gate
+    // Finish gate
     if ((currentSegmentType & SEGMENTTYPE_FINISHGATE) == SEGMENTTYPE_FINISHGATE) {
       // y-position of gate dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
       if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
-        // left pole
+        // Left pole
         display.drawFastVLine(borderLeftBegin,sceneHeight-1,y+1,SSD1306_WHITE);
         display.drawFastVLine(borderLeftBegin+1,sceneHeight-1,y+1,SSD1306_BLACK);
         display.drawFastVLine(borderLeftBegin-1,sceneHeight-1,y+1,SSD1306_BLACK);
 
-        // right pole
+        // Right pole
         display.drawFastVLine(borderRightBegin+borderRightWidth-1,sceneHeight-1,y+1,SSD1306_WHITE);
         display.drawFastVLine(borderRightBegin+borderRightWidth-2,sceneHeight-1,y+1,SSD1306_BLACK);
         display.drawFastVLine(borderRightBegin+borderRightWidth,sceneHeight-1,y+1,SSD1306_BLACK);
 
-        // top banner
+        // Top banner
         display.fillRect(borderLeftBegin,sceneHeight-((y+1)>>1)-1,borderRightBegin-borderLeftBegin+borderRightWidth,(y+1)>>1,SSD1306_WHITE);
       }
     }
 
-    // right curve warning
+    // Right curve warning
     if ((currentSegmentType & SEGMENTTYPE_RIGHTWARNING) == SEGMENTTYPE_RIGHTWARNING) {
       // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
       if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
@@ -369,7 +361,7 @@ void drawScene() {
         if (currentWidth < 4) currentWidth = 4;
         currentHeight = (y+1)*WARNINGHEIGHT/sceneHeight;
         if (currentHeight < 4) currentHeight = 4;
-         // triangle to right
+         // Triangle to right
          display.fillTriangle(borderLeftBegin,sceneHeight+y-currentHeight/2,
           borderLeftBegin-currentWidth,sceneHeight+y-currentHeight,
           borderLeftBegin-currentWidth,sceneHeight+y, SSD1306_BLACK);
@@ -379,7 +371,7 @@ void drawScene() {
       }
     }
 
-    // left curve warning
+    // Left curve warning
     if ((currentSegmentType & SEGMENTTYPE_LEFTWARNING) == SEGMENTTYPE_LEFTWARNING) {
       // y-position dependent on perspective y = sceneHeight * currentSegmentPosition / (currentSegmentLength-currentSegmentPosition)
       if ((currentSegmentLength-currentSegmentPosition>0) && (y == (sceneHeight*currentSegmentPosition/(currentSegmentLength-currentSegmentPosition)))) {
@@ -387,7 +379,7 @@ void drawScene() {
         if (currentWidth < 4) currentWidth = 4;
         currentHeight = (y+1)*WARNINGHEIGHT/sceneHeight;
         if (currentHeight < 4) currentHeight = 4;
-        // triangle to left
+        // Triangle to left
         display.fillTriangle(borderRightBegin+borderRightWidth-1,sceneHeight+y-currentHeight/2,
           borderRightBegin+borderRightWidth-1+currentWidth,sceneHeight+y-currentHeight,
           borderRightBegin+borderRightWidth-1+currentWidth,sceneHeight+y, SSD1306_BLACK);
@@ -397,7 +389,7 @@ void drawScene() {
       }
     }
 
-    if (y == 20) { // player line
+    if (y == 20) { // Player line
       g_streetMiddle = currentMiddle;
       // Reduce speed in the grass
       if (millis()-lastSlowdownMS > 50) {
@@ -410,17 +402,20 @@ void drawScene() {
   }
 }
 
-// initial game settings
+// Initial game settings and start signal sequence
 void resetGame() {
   g_streetMiddle = SCREEN_WIDTH/2;
   g_playerPos = g_streetMiddle;
   g_speed = 0;
   g_laps = 0;
-  g_startMS = millis();
   g_distance = 0;
+
+  startSignalSequence(); // Start signal sequence
+
+  g_startMS = millis(); // Start time
 }
 
-// blink internal led
+// Blink internal led
 void blink(int time) {
   digitalWrite(LED_BUILTIN,HIGH);
   delay(time);
@@ -428,14 +423,69 @@ void blink(int time) {
   delay(time);
 }
 
+// Start signal sequence
+void startSignalSequence() {
+  #define LIGHTCOUNT 5
+  #define LIGHTSIZE 6
+  #define LIGHTDURATIONMS 500
+
+  display.clearDisplay();
+
+  // Draw sky
+  drawSky();
+
+  // Draw scene
+  drawScene();
+
+  // Draw player sprite
+  drawPlayer();
+
+  const byte signalsOffsetX = 34;
+  const byte signalsHeight = LIGHTSIZE+4;
+  const byte signalsWidth = SCREEN_WIDTH-signalsOffsetX*2;
+
+  // Draw starting lights
+  unsigned long lastSequenceStartMS = millis();
+  unsigned long runtimeMS = 0;
+  byte lastSignalSequence = -1;
+  byte lightColor = SSD1306_BLACK;
+  byte y = 1+(signalsHeight - LIGHTSIZE)>>1;
+  do {
+    display.fillRect(signalsOffsetX,0,signalsWidth,signalsHeight,SSD1306_WHITE);
+    runtimeMS = millis()-lastSequenceStartMS;
+    byte signalSequence = runtimeMS / LIGHTDURATIONMS;
+
+    for (int i=0;i<LIGHTCOUNT;i++) {
+      byte x = signalsOffsetX + signalsWidth/LIGHTCOUNT*i + (signalsWidth/LIGHTCOUNT - LIGHTSIZE)/2 ;
+      display.fillRect(x-1,y-1, LIGHTSIZE+2,LIGHTSIZE+2, SSD1306_BLACK);
+      lightColor = SSD1306_BLACK;
+      if ((signalSequence >= i) && (runtimeMS <= LIGHTCOUNT*LIGHTDURATIONMS)) lightColor = SSD1306_WHITE;
+      display.fillRect(x,y, LIGHTSIZE,LIGHTSIZE, lightColor);
+    }
+
+    // Show display buffer on screen
+    display.display();
+
+    // Buzzer signal
+    #ifdef USE_BUZZER
+    if (signalSequence != lastSignalSequence) {
+      if (runtimeMS > LIGHTCOUNT*LIGHTDURATIONMS)
+        tone(BUZZERPIN,2000,LIGHTDURATIONMS/2); // Start
+      else
+        tone(BUZZERPIN,1000,LIGHTDURATIONMS/2); // Wait
+    }
+    #endif
+    lastSignalSequence = signalSequence;
+  } while (runtimeMS < LIGHTCOUNT*LIGHTDURATIONMS);
+  delay(LIGHTDURATIONMS/2);
+}
+
 void setup(void) {
-  uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
-  uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-  uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
+  uint8_t devStatus; // Return status after each device operation (0 = success, !0 = error)
 
   pinMode(LED_BUILTIN,OUTPUT);
 
-  //Start I2C
+  // Start I2C
   Wire.begin();
 
   // OLED init
@@ -460,20 +510,17 @@ void setup(void) {
   // MPU6050 init
   mpu.initialize();
 
-  pinMode(MPU_INTERRUPT_PIN, INPUT);
-
-  // verify connection
+  // Verify connection
   if (!mpu.testConnection()) {
     // MPU6050 connection failed
     display.clearDisplay();
     display.setCursor(0,0);
-    display.print(F("MPU failed"));
+    display.print(F("MPU error"));
     display.display();
-    blink(1000);
     while (true);
   }
 
-  // load and configure the DMP
+  // Load and configure the DMP
   devStatus = mpu.dmpInitialize();
 
   if (devStatus != 0) {
@@ -485,14 +532,8 @@ void setup(void) {
     // DMP Initialization failed
     display.clearDisplay();
     display.setCursor(0,0);
-    display.println(F("DMP failed"));
-    display.print(F("Status "));
-    display.print(devStatus);
+    display.print(F("DMP error"));
     display.display();
-    blink(1000);
-    blink(1000);
-    if (devStatus==1) blink(500);
-    if (devStatus==2) { blink(500);blink(500); }
     while (true);
   }
 
@@ -507,18 +548,8 @@ void setup(void) {
   // Calibration Time: generate offsets and calibrate our MPU6050
   mpu.CalibrateAccel(6);
   mpu.CalibrateGyro(6);
-  // turn on the DMP, now that it's ready
+  // Turn on the DMP, now that it's ready
   mpu.setDMPEnabled(true);
-
-  // enable Arduino interrupt detection
-  attachInterrupt(digitalPinToInterrupt(MPU_INTERRUPT_PIN), dmpDataReady, RISING);
-  mpuIntStatus = mpu.getIntStatus();
-
-  // set our DMP Ready flag so the main loop() function knows it's okay to use it
-  dmpReady = true;
-
-  // get expected DMP packet size for later comparison
-  packetSize = mpu.dmpGetFIFOPacketSize();
 
   #else
 
@@ -526,18 +557,19 @@ void setup(void) {
 
   #endif
 
-  resetGame();
-
   // Small text size for next outputs
   display.setTextSize(1);
+
+  // Reset data and start signal sequence
+  resetGame();
 }
 
 void loop(void) {
-  char strData[24];
+  #define MAXSTRDATASIZE 21
+  char strData[MAXSTRDATASIZE+1];
   unsigned long startMS, endMS;
   static unsigned long lastPlayerMS = 0;
   static unsigned long lastBuzzerMS = 0;
-  static unsigned int fps = 0;
   static int roll = 0;
   static int pitch = 0;
 
@@ -551,23 +583,21 @@ void loop(void) {
 
   #endif
 
-  // record start of frame
+  // Get start of frame
   startMS = millis();
 
   #ifndef DEMOMODE
 
-  // get pitch, roll and yaw from MPU6050
-  if (dmpReady) {
-    // read a packet from FIFO
-    rc = mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
+  // Get pitch, roll and yaw from MPU6050
+  // Read a packet from FIFO
+  rc = mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
 
-    if (rc) { // Get the Latest packet
-      mpu.dmpGetQuaternion(&q, fifoBuffer);
-      mpu.dmpGetGravity(&gravity, &q);
-      mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-      pitch = -ypr[1] * 180/M_PI;
-      roll = -ypr[2] * 180/M_PI;
-    }
+  if (rc) { // Get latest packet
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    pitch = -ypr[1] * 180/M_PI;
+    roll = -ypr[2] * 180/M_PI;
   }
 
   #else
@@ -577,24 +607,24 @@ void loop(void) {
 
   #endif
 
-  // change player sprite
+  // Set player sprite
   g_sprite  = 0;
 
-  if (roll < -1) { // tilt to left
+  if (roll < -1) { // Tilt to left
     g_sprite=INDIVIDUALSPRITES-(roll>>3);
     if (g_sprite > (INDIVIDUALSPRITES<<1)-2) g_sprite = (INDIVIDUALSPRITES<<1)-2;
   }
-  if (roll > 1) { // tilt to right
+  if (roll > 1) { // Tilt to right
     g_sprite=1+(roll>>3);
     if (g_sprite > INDIVIDUALSPRITES-1) g_sprite=INDIVIDUALSPRITES-1;
   }
 
-  // control player every 100ms
+  // Control player every 100ms
   if (millis()-lastPlayerMS>100) {
-    // increase/decrease speed
-    if (pitch > 10) { // decrease by pitch
+    // Increase/decrease speed
+    if (pitch > 10) { // Decrease by pitch
       if (g_speed > 1) g_speed--;
-    } else { // increase automatically
+    } else { // Increase automatically
       if (g_speed > 140) g_speed++; else g_speed+=2;
       if (g_speed > MAXSPEED) g_speed = MAXSPEED;
     }
@@ -614,14 +644,21 @@ void loop(void) {
     lastPlayerMS = millis();
   }
 
-  // clear display buffer
+  // Clear display buffer
   display.clearDisplay();
+
+  // Draw sky
+  drawSky();
+
+  // Draw scene
+  drawScene();
 
   // End of game
   if (g_laps >= MAXLAPS) {
     #ifdef USE_BUZZER
     noTone(BUZZERPIN);
     #endif
+    display.clearDisplay();
     display.setTextSize(2);
     display.setCursor(50,20);
     display.print(F("Fin"));
@@ -632,26 +669,20 @@ void loop(void) {
     display.print(F(" seconds"));
     display.display();
     delay(10000);
-    // start again
-    display.clearDisplay();
+    // Start game again (Reset data and start signal sequence)
     resetGame();
+    return;
   }
 
-  // draw sky
-  drawSky();
-
-  // draw scene
-  drawScene();
-
-  // draw player sprite
+  // Draw player sprite
   drawPlayer();
 
-  // draw statistics data
-  snprintf(strData,24,"Lap%2d       %3d km/h",g_laps+1,g_speed);
+  // Draw statistics data
+  snprintf(strData,MAXSTRDATASIZE+1,"Lap%2d        %3d km/h",g_laps+1,g_speed);
   display.setCursor(0,0);
   display.print(strData);
 
-  // show display buffer on screen
+  // Show display buffer on screen
   display.display();
 
   // Buzzersound
@@ -662,10 +693,8 @@ void loop(void) {
   }
   #endif
 
-  // Limit frames per second to 15 ftps to prevent a too fast game (e.g. in demo mode or with a mcu faster than an ATmega328)
+  // Limit frames per second to 15 fps to prevent a too fast game (e.g. in demo mode or with a mcu faster than an ATmega328)
   do {
     endMS = millis();
   } while (endMS-startMS<66);
-  // Calculate frames per second
-  if (endMS - startMS > 0) fps = 1000/(endMS - startMS);
 }
